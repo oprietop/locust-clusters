@@ -1,0 +1,145 @@
+#! /usr/bin/python
+# -*- coding: utf8 -*-
+
+import os
+import sys
+import json
+import time
+import gevent
+import requests
+from requests.adapters import HTTPAdapter
+from influxdb import InfluxDBClient
+from locust import web
+from datetime import datetime
+
+
+class stats(object):
+    def __init__(self):
+        # Variables
+        self.grafana_url = os.environ.get('GRAFANA_URL', 'http://grafana:3000')
+        self.grafana_user = os.environ.get('GRAFANA_USER', 'admin')
+        self.grafana_password = os.environ.get('GRAFANA_PASSWORD', 'admin')
+        self.grafana_dashboard = os.environ.get('GRAFANA_DASHBOARD', 'dashboard.json')
+        self.influxdb_host = os.environ.get('INFLUXDB_HOST', 'http://influxdb:8086')
+        self.influxdb_db = os.environ.get('INFLUXDB_DB', 'locust')
+        self.locust_stats = os.environ.get('LOCUST_STATS', 'http://locust:8089/stats/requests')
+        self.interval = os.environ.get('INTERVAL', 10)
+        # Stuff
+        self.grafana_session()
+        self.init_influxdb()
+        self.init_grafana_datasource()
+        self.init_grafana_dashboard()
+
+
+    def init_influxdb(self):
+        sys.stdout.write("Initializing InfluxDB.")
+        self.influxdb = InfluxDBClient('influxdb', 8086, 'root', 'root', 'locust')
+        self.influxdb.create_database('locust')
+
+
+    def init_influxdb2(self):
+        sys.stdout.write("Initializing InfluxDB.")
+        payload = { "q": "CREATE DATABASE locust" }
+        response = self.session.post("{}/query".format(self.influxdb_host), params=payload)
+        sys.stdout.write('Creating the locust Database: {} {}'.format(response.status_code, response.json()))
+
+
+    def grafana_session(self):
+        self.session = requests.Session()
+        self.session.auth = (self.grafana_user, self.grafana_password)
+        self.session.headers.update = ({'Content-Type': 'application/json'})
+        self.session.mount('http://', HTTPAdapter(max_retries=5))
+        self.session.mount('https://', HTTPAdapter(max_retries=5))
+
+
+    def init_grafana_datasource(self):
+        sys.stdout.write("Initializing the Grafana datasource.")
+        response = self.session.get("{}/api/org".format(self.grafana_url))
+        sys.stdout.write('Authenticating to grafana: {} {}'.format(response.status_code, response.json()))
+        # Create data source
+        payload = { "access": "proxy"
+                  , "database": "locust"
+                  , "isDefault": True
+                  , "name": "locust"
+                  , "password": "root"
+                  , "type": "influxdb"
+                  , "url": self.influxdb_host
+                  , "user": "root"
+                  }
+        response = self.session.post("{}/api/datasources".format(self.grafana_url), json=payload)
+        sys.stdout.write('Creating the locust Datasource: {} {}'.format(response.status_code, response.json()))
+        response = self.session.get("{}/api/datasources/locust".format(self.grafana_url))
+        sys.stdout.write('sys.stdout.writeing the locust Datasource: {} {}'.format(response.status_code, response.json()))
+
+
+    def init_grafana_dashboard(self):
+        sys.stdout.write("Initializing the Grafana dasboard.")
+        response = self.session.get("{}/api/org".format(self.grafana_url))
+        sys.stdout.write('Authenticating to grafana: {} {}'.format(response.status_code, response.json()))
+        dashboard_json = open(self.grafana_dashboard).read()
+        dashboard_dict = json.loads(dashboard_json)
+        payload = { "dashboard": dashboard_dict
+                  , "overwrite": False
+                  }
+        response = self.session.post("{}/api/dashboards/db".format(self.grafana_url), json=payload)
+        sys.stdout.write('POSTing the dasboard: {} {}'.format(response.status_code, response.json()))
+
+
+    def get_stats(self):
+        stats_json = web.request_stats()
+        stats_dict = json.loads(stats_json)
+        self.push_data(stats_dict)
+
+
+    def push_data(self, stats_dict):
+        points = []
+        time = datetime.now().isoformat()
+        for stat in stats_dict['stats']:
+            for k, v in stat.items():
+                if type(v) == int or type(v) == float:
+                    v = float(v)
+                    d = {}
+                    d['measurement'] = k
+                    d['tags'] = { "name": stat['name'], "method": stat['method'] }
+                    d['time'] = time
+                    d['fields'] = { "value": v }
+                    points.append(d)
+        for k, v in stats_dict.items():
+            if type(v) == int or type(v) == float:
+                v = float(v)
+                d = {}
+                d['measurement'] = k
+                d['time'] = time
+                d['fields'] = { "value": v }
+                points.append(d)
+        sys.stdout.write('Pushing {} points to influxdb...'.format(len(points)))
+        self.influxdb.write_points(points)
+
+
+    def annotate(self, title="Title", text="<a href='https://github.com'>Release notes</a>"):
+        time = datetime.now().isoformat()
+        #v = float(v)
+        points = []
+        d = {}
+        d['measurement'] = 'events'
+        d['fields'] = { "title": title, "text": text }
+        d['tags'] = { "name": 'test', "method": 'events' }
+        d['time'] = time
+        points.append(d)
+        sys.stdout.write('Pushing {} Anntotation to influxdb...'.format(len(points)))
+        self.influxdb.write_points(points)
+
+
+    def loop(self):
+        while True:
+            gevent.sleep(self.interval)
+            self.get_stats()
+
+
+    def start(self):
+        gevent.spawn(self.loop)
+
+
+if __name__ == '__main__':
+    r = stats()
+    r.start()

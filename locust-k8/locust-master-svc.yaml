@@ -1,0 +1,17 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: locust-master
+  labels:
+    role: master
+spec:
+  ports:
+    - port: 8089
+      name: master-web
+    - port: 5557
+      name: master-p1
+    - port: 5558
+      name: master-p2
+  selector:
+    role: master
+  type: NodePort

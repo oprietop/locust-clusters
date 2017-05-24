@@ -1,0 +1,18 @@
+kind: ReplicationController
+metadata:
+  name: influxdb
+spec:
+  replicas: 1
+  selector:
+    app: influxdb
+  template:
+    metadata:
+      labels:
+        app: influxdb
+    spec:
+      containers:
+      - name: influxdb
+        image: influxdb:alpine
+        env:
+        - name: TZ
+          value: /usr/share/zoneinfo/Europe/Madrid

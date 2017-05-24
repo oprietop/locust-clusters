@@ -1,0 +1,62 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: locust-master
+  labels:
+    role: master
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  template:
+    metadata:
+      labels:
+        role: master
+    spec:
+      containers:
+      - name: locust
+        image: oprietop/locust
+        command: ["/bin/sh","-c"]
+        args: ["locust --master"]
+        livenessProbe:
+          periodSeconds: 30
+          httpGet:
+            path: /
+            port: 8089
+        readinessProbe:
+          periodSeconds: 30
+          httpGet:
+            path: /
+            port: 8089
+        volumeMounts:
+        - name: locustfile
+          mountPath: /locust/locustfile.py
+          subPath: locustfile.py
+        - name: stats
+          mountPath: /locust/stats.py
+          subPath: stats.py
+        - name: dashboard
+          mountPath: /locust/dashboard.json
+          subPath: dashboard.json
+      volumes:
+      - name: locustfile
+        configMap:
+          name: locustfile
+          items:
+          - key: locustfile.py
+            path: locustfile.py
+      - name: stats
+        configMap:
+          name: stats
+          items:
+          - key: stats.py
+            path: stats.py
+      - name: dashboard
+        configMap:
+          name: dashboard
+          items:
+          - key: dashboard.json
+            path: dashboard.json

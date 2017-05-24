@@ -1,0 +1,29 @@
+kind: ReplicationController
+metadata:
+  name: grafana
+spec:
+  replicas: 1
+  selector:
+    app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      containers:
+      - name: grafana
+        image: grafana/grafana:4.2.0
+        env:
+        - name: TZ
+          value: /usr/share/zoneinfo/Europe/Madrid
+        volumeMounts:
+        - name: grafana-ini
+          mountPath: /etc/grafana/grafana.ini
+          subPath: grafana.ini
+      volumes:
+      - name: grafana-ini
+        configMap:
+          name: grafana-ini
+          items:
+          - key: grafana.ini
+            path: grafana.ini
