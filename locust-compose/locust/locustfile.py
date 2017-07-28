@@ -4,6 +4,9 @@
 from locust import HttpLocust, TaskSet, task, events
 from stats import stats
 
+# Pump resources
+import resource
+resource.setrlimit(resource.RLIMIT_NOFILE, (999999, 999999))
 
 class Postman_TaskSet(TaskSet):
     def on_start(self):
@@ -24,10 +27,17 @@ class MyLocust(HttpLocust):
     min_wait = 10000
     max_wait = 30000
 
+# Initialize the influxDB stats
+s = stats()
 
 # Initialize and run the stats reporting
-def reporting():
-    s = stats()
+def start_reporting():
     s.start()
 
-events.master_start_hatching += reporting
+events.master_start_hatching += start_reporting
+
+# Stop the stats reporting
+def stop_reporting():
+    s.stop()
+
+events.master_stop_hatching += stop_reporting
