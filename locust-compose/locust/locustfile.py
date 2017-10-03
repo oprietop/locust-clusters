@@ -25,19 +25,19 @@ class MyLocust(HttpLocust):
     host = 'https://postman-echo.com'
     task_set = Postman_TaskSet
     min_wait = 10000
-    max_wait = 30000
+    max_wait = 30000    # Initialize the influxDB stats and hooks on the master
 
-# Initialize the influxDB stats
-s = stats()
+if '--master' in sys.argv:
+    s = stats()
 
-# Initialize and run the stats reporting
-def start_reporting():
-    s.start()
+    # Initialize and run the stats reporting
+    def start_reporting():
+        if '--master' in sys.argv:
+            s.start()
 
-events.master_start_hatching += start_reporting
-
-# Stop the stats reporting
-def stop_reporting():
-    s.stop()
-
-events.master_stop_hatching += stop_reporting
+    # Stop the stats reporting
+    def stop_reporting():
+         s.stop()
+    # Hook the functions into events
+    events.master_start_hatching += start_reporting
+    events.master_stop_hatching += stop_reporting
