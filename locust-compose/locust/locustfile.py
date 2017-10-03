@@ -32,12 +32,12 @@ if '--master' in sys.argv:
 
     # Initialize and run the stats reporting
     def start_reporting():
-        if '--master' in sys.argv:
             s.start()
 
     # Stop the stats reporting
     def stop_reporting():
          s.stop()
+            
     # Hook the functions into events
     events.master_start_hatching += start_reporting
     events.master_stop_hatching += stop_reporting
