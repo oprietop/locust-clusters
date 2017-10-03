@@ -32,18 +32,18 @@ data:
         task_set = Postman_TaskSet
         min_wait = 10000
         max_wait = 30000
-
-    # Initialize the influxDB stats
+        
+if '--master' in sys.argv:
     s = stats()
 
     # Initialize and run the stats reporting
     def start_reporting():
-        s.start()
-
-    events.master_start_hatching += start_reporting
+            s.start()
 
     # Stop the stats reporting
     def stop_reporting():
-        s.stop()
-
+         s.stop()
+         
+    # Hook the functions into events
+    events.master_start_hatching += start_reporting
     events.master_stop_hatching += stop_reporting
