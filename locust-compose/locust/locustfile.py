@@ -5,7 +5,7 @@ from locust import HttpLocust, TaskSet, task, events
 from stats import stats
 
 # Pump resources
-import resource
+import sys, resource
 resource.setrlimit(resource.RLIMIT_NOFILE, (999999, 999999))
 
 class Postman_TaskSet(TaskSet):
